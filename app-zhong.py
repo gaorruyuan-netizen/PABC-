@@ -1,6 +1,7 @@
 import streamlit as st
 import joblib
 import numpy as np
+import pandas as pd
 
 # =========================================================
 # 页面配置
@@ -12,12 +13,11 @@ st.set_page_config(
 )
 
 # =========================================================
-# 样式：白底、深蓝标题、论文风格
+# 全局样式：白底 + 深蓝论文风格
 # =========================================================
 st.markdown(
     """
     <style>
-    /* ===== 全局 ===== */
     .stApp {
         background-color: #f7f9fc;
         color: #1f2937;
@@ -29,30 +29,30 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* 顶部栏隐藏，便于截图 */
     header[data-testid="stHeader"] {
         background: transparent;
         height: 0rem;
     }
+
     [data-testid="stToolbar"] {
         display: none;
     }
 
-    /* ===== 侧边栏 ===== */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
         border-right: none;
     }
+
     section[data-testid="stSidebar"] * {
         color: #f8fafc !important;
     }
-    section[data-testid="stSidebar"] h2, 
+
+    section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3 {
         color: #ffffff !important;
         font-weight: 700 !important;
     }
 
-    /* ===== 主标题与正文 ===== */
     .main-title {
         font-size: 2.8rem;
         font-weight: 800;
@@ -60,6 +60,7 @@ st.markdown(
         margin-bottom: 0.35rem;
         letter-spacing: 0.5px;
     }
+
     .sub-text {
         color: #4b5563;
         font-size: 1.05rem;
@@ -67,7 +68,6 @@ st.markdown(
         margin-bottom: 1.2rem;
     }
 
-    /* ===== 模块卡片 ===== */
     .white-card {
         background: #ffffff;
         border: 1px solid #dbe3ee;
@@ -84,34 +84,34 @@ st.markdown(
         margin-bottom: 0.6rem;
     }
 
-    /* ===== 标签 ===== */
     .stNumberInput label {
         color: #334155 !important;
         font-weight: 600 !important;
         font-size: 0.98rem !important;
     }
 
-    /* ===== 输入框 ===== */
     div[data-baseweb="input"] {
         background: #ffffff !important;
         border: 1.4px solid #cbd5e1 !important;
         border-radius: 12px !important;
         box-shadow: none !important;
     }
+
     div[data-baseweb="input"]:focus-within {
         border: 1.6px solid #0b2e59 !important;
         box-shadow: 0 0 0 2px rgba(11, 46, 89, 0.10) !important;
     }
+
     div[data-baseweb="input"] input {
         color: #111827 !important;
         background: #ffffff !important;
         font-weight: 500 !important;
     }
+
     div[data-baseweb="input"] button {
         color: #0b2e59 !important;
     }
 
-    /* ===== 按钮 ===== */
     .stButton > button {
         width: 100%;
         background: linear-gradient(135deg, #0b2e59 0%, #174a84 100%) !important;
@@ -123,12 +123,12 @@ st.markdown(
         font-weight: 700;
         box-shadow: 0 6px 16px rgba(23, 74, 132, 0.22);
     }
+
     .stButton > button:hover {
         background: linear-gradient(135deg, #174a84 0%, #215c9d 100%) !important;
         color: #ffffff !important;
     }
 
-    /* ===== 预测结果卡片 ===== */
     .result-card {
         background: linear-gradient(135deg, #eef9f0 0%, #f7fcf8 100%);
         border: 1px solid #b7dfc0;
@@ -137,12 +137,14 @@ st.markdown(
         margin-top: 6px;
         box-shadow: 0 4px 12px rgba(34, 197, 94, 0.08);
     }
+
     .result-title {
         color: #166534;
         font-size: 1rem;
         font-weight: 700;
         margin-bottom: 4px;
     }
+
     .result-value {
         color: #14532d;
         font-size: 2rem;
@@ -150,12 +152,10 @@ st.markdown(
         line-height: 1.2;
     }
 
-    /* ===== 错误框 ===== */
     div[data-testid="stAlert"] {
         border-radius: 12px !important;
     }
 
-    /* ===== expander ===== */
     details {
         background: #ffffff;
         border: 1px solid #dbe3ee;
@@ -163,7 +163,12 @@ st.markdown(
         padding: 0.4rem 0.8rem;
     }
 
-    /* ===== 让页面更干净 ===== */
+    .stDataFrame {
+        border: 1px solid #d9e2ec;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
     footer {
         visibility: hidden;
     }
@@ -186,7 +191,7 @@ def load_model():
 model = load_model()
 
 # =========================================================
-# 特征工程（必须保留，否则模型无法预测）
+# 特征工程（保留，但不在界面显示）
 # =========================================================
 def transform_temperature(T: np.ndarray) -> np.ndarray:
     return np.asarray(T, dtype=float) / 800.0
@@ -245,6 +250,7 @@ def add_temperature_nonlinear_features(X: np.ndarray, temp_col_idx: int) -> np.n
         invT.reshape(-1, 1),
         X[:, temp_col_idx + 1:]
     ])
+
     return X_extended
 
 
@@ -260,7 +266,7 @@ def preprocess_input(cement, sand, water, sa, ep, bf, hrwr, dp, t) -> np.ndarray
 def predict_strength(cement, sand, water, sa, ep, bf, hrwr, dp, t):
     X = preprocess_input(cement, sand, water, sa, ep, bf, hrwr, dp, t)
     y_pred = model.predict(X)[0]
-    return float(y_pred), X
+    return float(y_pred)
 
 
 # =========================================================
@@ -273,7 +279,7 @@ st.markdown(
 )
 
 # =========================================================
-# 侧边栏
+# 侧边栏（仅显示你需要保留的内容）
 # =========================================================
 with st.sidebar:
     st.markdown("## 模型信息")
@@ -317,7 +323,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # =========================================================
 if predict_button:
     try:
-        pred, _ = predict_strength(cement, sand, water, sa, ep, bf, hrwr, dp, t)
+        pred = predict_strength(cement, sand, water, sa, ep, bf, hrwr, dp, t)
 
         st.markdown(
             f"""
