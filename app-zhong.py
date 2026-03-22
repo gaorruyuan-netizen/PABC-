@@ -13,95 +13,33 @@ st.set_page_config(
 )
 
 # =========================================================
-# 全局样式：白底 + 深蓝论文风格
+# 白色论文风格界面
 # =========================================================
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #ffffff;
-        color: #1f2937;
-    }
-
-    .block-container {
-        padding-top: 2.2rem;
-        padding-bottom: 2rem;
-        max-width: 1250px;
-    }
-
-    header[data-testid="stHeader"] {
-        background: #ffffff;
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: #f7f9fc;
-        border-right: 1px solid #e5e7eb;
-    }
-
-    section[data-testid="stSidebar"] * {
-        color: #1f2937 !important;
-    }
-
-    h1, h2, h3 {
-        color: #0b2e59 !important;
-        font-weight: 700 !important;
-    }
-
-    .stNumberInput label {
-        color: #374151 !important;
-        font-weight: 600 !important;
-    }
-
-    div[data-baseweb="input"] {
-        background-color: #ffffff !important;
-        border: 1px solid #cfd8e3 !important;
-        border-radius: 10px !important;
-    }
-
-    div[data-baseweb="input"] input {
-        background-color: #ffffff !important;
-        color: #111827 !important;
-    }
-
-    .stButton > button {
-        width: 100%;
-        background-color: #0b2e59 !important;
-        color: #ffffff !important;
-        border-radius: 10px !important;
-        height: 3.2em;
-        font-size: 16px;
-        font-weight: 600;
-    }
-
-    .stButton > button:hover {
-        background-color: #174a84 !important;
-    }
-
-    .metric-box {
-        background: linear-gradient(135deg, #edf7ed 0%, #f6fbf6 100%);
-        border: 1px solid #b7dfc0;
-        border-radius: 12px;
-        padding: 16px 18px;
-        margin-top: 10px;
-        margin-bottom: 8px;
-    }
-
-    .metric-title {
-        color: #166534 !important;
-        font-size: 0.95rem;
-        font-weight: 600;
-    }
-
-    .metric-value {
-        color: #14532d !important;
-        font-size: 1.55rem;
-        font-weight: 700;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+.stApp {
+    background-color: #ffffff;
+}
+h1, h2, h3 {
+    color: #0b2e59;
+    font-weight: 700;
+}
+.stButton>button {
+    background-color: #0b2e59;
+    color: white;
+    border-radius: 10px;
+    height: 3em;
+    font-size: 16px;
+    font-weight: 600;
+}
+.metric-box {
+    background: #edf7ed;
+    border: 1px solid #b7dfc0;
+    border-radius: 12px;
+    padding: 15px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 MODEL_PATH = "best_model.pkl"
 FEATURE_COLS = ['Cement', 'Sand', 'Water', 'SA', 'EP', 'BF', 'HRWR', 'DP', 'T']
@@ -117,23 +55,50 @@ def load_model():
 model = load_model()
 
 # =========================================================
-# 特征工程（必须与训练时一致）
+# 特征工程（必须保留！！！）
 # =========================================================
 def transform_temperature(T):
     return T / 800.0
 
+def add_features(X):
+    Cement, Sand, Water, SA, EP, BF, HRWR, DP, T = X.T
+
+    Binder = Cement + SA + DP + HRWR
+    TotalMass = Water + Cement + Sand + SA + EP + BF + HRWR + DP
+
+    features = [
+        Water / (Cement + EPS),
+        SA / (Cement + EPS),
+        DP / (Cement + EPS),
+        HRWR / (Cement + EPS),
+        EP / (Sand + EPS),
+        Water / (Binder + EPS),
+        Sand / (Binder + EPS),
+        TotalMass,
+        Water / (TotalMass + EPS),
+        BF / (Binder + EPS),
+        Sand / (Sand + BF + EPS),
+        (Sand + BF) / (Binder + EPS),
+    ]
+
+    T_prime = T
+    T2 = T_prime ** 2
+    logT = np.log1p(T_prime)
+    invT = 1 / (T_prime + EPS)
+
+    X_new = np.column_stack([X, T2, logT, invT] + features)
+    return X_new
 
 def preprocess_input(cement, sand, water, sa, ep, bf, hrwr, dp, t):
-    X = np.array([[cement, sand, water, sa, ep, bf, hrwr, dp, t]], dtype=float)
+    X = np.array([[cement, sand, water, sa, ep, bf, hrwr, dp, t]])
     X[:, -1] = transform_temperature(X[:, -1])
+    X = add_features(X)
     return X
-
 
 def predict_strength(cement, sand, water, sa, ep, bf, hrwr, dp, t):
     X = preprocess_input(cement, sand, water, sa, ep, bf, hrwr, dp, t)
     y_pred = model.predict(X)[0]
-    return float(y_pred), X
-
+    return y_pred
 
 # =========================================================
 # 页面标题
@@ -149,7 +114,6 @@ with st.sidebar:
     st.write("模型类型：LightGBM")
     st.write("预测目标：抗压强度")
     st.write("输入变量：9个原始特征")
-    st.write("温度处理方式：T / 800")
 
     st.header("说明")
     st.write("所有材料用量单位应与训练数据保持一致。")
@@ -157,7 +121,7 @@ with st.sidebar:
     st.write("预测结果单位：MPa")
 
 # =========================================================
-# 输入区域
+# 输入
 # =========================================================
 col1, col2, col3 = st.columns(3)
 
@@ -183,35 +147,15 @@ predict_button = st.button("预测抗压强度")
 # =========================================================
 if predict_button:
     try:
-        pred, X_processed = predict_strength(
+        pred = predict_strength(
             cement, sand, water, sa, ep, bf, hrwr, dp, t
         )
 
-        st.markdown(
-            f"""
-            <div class="metric-box">
-                <div class="metric-title">预测结果</div>
-                <div class="metric-value">{pred:.3f} MPa</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        raw_input_df = pd.DataFrame([{
-            "水泥": cement,
-            "砂": sand,
-            "水": water,
-            "SA": sa,
-            "EP": ep,
-            "BF": bf,
-            "HRWR": hrwr,
-            "DP": dp,
-            "温度 (°C)": t
-        }])
-
-        st.subheader("输入参数汇总")
-        st.dataframe(raw_input_df, use_container_width=True)
+        st.markdown(f"""
+        <div class="metric-box">
+        <h3>预测结果：{pred:.3f} MPa</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"预测失败：{e}")
-
